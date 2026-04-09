@@ -15,10 +15,20 @@
         .meta-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
         .meta-box label { display: block; font-weight: bold; font-size: 0.7em; margin-bottom: 2px; }
         .meta-box input { width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85em; }
-        .input-section { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .input-section { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; position: relative; }
         .input-grid { display: grid; grid-template-columns: 2fr 0.8fr 1fr 1.2fr auto; gap: 5px; align-items: end; }
         .input-grid input, .input-grid select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%; font-size: 0.85em; }
         .btn-add { padding: 0 15px; background: #3498db; color: white; border: none; border-radius: 6px; font-weight: bold; height: 40px; cursor: pointer; }
+
+        /* Custom Suggestion List Styles */
+        #suggestionBox {
+            position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px;
+            width: 40%; max-height: 150px; overflow-y: auto; z-index: 100; display: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); top: 55px; left: 12px;
+        }
+        .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9em; }
+        .suggestion-item:hover { background-color: #f0f2f5; }
+
         .scrollable-list { flex-grow: 1; overflow-y: auto; padding: 0 15px; -webkit-overflow-scrolling: touch; }
         table { width: 100%; border-collapse: collapse; }
         th { position: sticky; top: 0; background: #34495e; color: white; padding: 10px; text-align: left; font-size: 0.8em; z-index: 10; }
@@ -26,10 +36,8 @@
         .btn-remove { background: #ff4757; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
         .fixed-bottom { padding: 15px; border-top: 2px solid #34495e; background: #fff; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
         .total-amount { font-size: 1.4em; font-weight: bold; color: #2c3e50; }
-        .actions { display: flex; gap: 8px; }
         .btn-download { padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        .btn-reset { padding: 10px 15px; background: #95a5a6; color: white; border: none; border-radius: 20px; cursor: pointer; }
-        @media (max-width: 600px) { .meta-row { grid-template-columns: 1fr; } .input-grid { grid-template-columns: 1fr 1fr; } .input-grid input:first-child { grid-column: span 2; } .btn-add { grid-column: span 2; } }
+        @media (max-width: 600px) { .meta-row { grid-template-columns: 1fr; } .input-grid { grid-template-columns: 1fr 1fr; } .input-grid input:first-child { grid-column: span 2; } .btn-add { grid-column: span 2; } #suggestionBox { width: 90%; } }
     </style>
 </head>
 <body>
@@ -49,17 +57,15 @@
 
         <div class="input-section">
             <div class="input-grid">
-                <input type="text" id="itemName" list="itemSuggestions" placeholder="Item Name">
-                <datalist id="itemSuggestions"></datalist>
+                <div style="position: relative; width: 100%;">
+                    <input type="text" id="itemName" placeholder="Item Name" autocomplete="off" oninput="showSuggestions(this.value)">
+                    <div id="suggestionBox"></div>
+                </div>
                 
                 <select id="unit">
-                    <option value="pcs">pcs</option>
-                    <option value="m">mtr</option>
-                    <option value="ft">ft</option>
-                    <option value="roll">roll</option>
-                    <option value="box">box</option>
+                    <option value="pcs">pcs</option><option value="m">mtr</option>
+                    <option value="ft">ft</option><option value="roll">roll</option><option value="box">box</option>
                 </select>
-
                 <input type="number" id="qty" placeholder="Qty">
                 <input type="number" id="price" placeholder="Price">
                 <button class="btn-add" onclick="addItem()">Add</button>
@@ -70,13 +76,7 @@
     <div class="scrollable-list">
         <table>
             <thead>
-                <tr>
-                    <th>Item</th>
-                    <th style="width: 70px;">Qty</th>
-                    <th style="width: 80px;">Unit P.</th>
-                    <th style="width: 80px;">Total</th>
-                    <th style="width: 30px;"></th>
-                </tr>
+                <tr><th>Item</th><th style="width: 70px;">Qty</th><th style="width: 80px;">Unit P.</th><th style="width: 80px;">Total</th><th style="width: 30px;"></th></tr>
             </thead>
             <tbody id="tableBody"></tbody>
         </table>
@@ -86,7 +86,6 @@
         <div><span style="font-size: 0.7em; color: #7f8c8d;">Grand Total:</span><br>
         <span class="total-amount">LKR <span id="grandTotal">0.00</span></span></div>
         <div class="actions">
-            <button class="btn-reset" onclick="resetForm()">Clear</button>
             <button class="btn-download" onclick="generatePDF()">PDF</button>
         </div>
     </div>
@@ -95,17 +94,11 @@
 <script>
     document.getElementById('displayDate').innerText = new Date().toLocaleDateString('en-GB');
     let items = [];
-    let savedNames = [];
+    let savedNames = JSON.parse(localStorage.getItem('savedItemNames')) || ["PVC Conduit", "Wire 1/1.13", "MCB 16A", "Switch 10A"];
 
-    // Load Data when app starts
     window.onload = function() {
         if(localStorage.getItem('issuerName')) document.getElementById('issuerName').value = localStorage.getItem('issuerName');
         if(localStorage.getItem('issuerContact')) document.getElementById('issuerContact').value = localStorage.getItem('issuerContact');
-        
-        if(localStorage.getItem('savedItemNames')) {
-            savedNames = JSON.parse(localStorage.getItem('savedItemNames'));
-            updateSuggestions();
-        }
     };
 
     function savePersonalDetails() {
@@ -113,15 +106,29 @@
         localStorage.setItem('issuerContact', document.getElementById('issuerContact').value);
     }
 
-    function updateSuggestions() {
-        const datalist = document.getElementById('itemSuggestions');
-        datalist.innerHTML = '';
-        savedNames.forEach(name => {
-            const option = document.createElement('option');
-            option.value = name;
-            datalist.appendChild(option);
-        });
+    function showSuggestions(val) {
+        const box = document.getElementById('suggestionBox');
+        if (!val) { box.style.display = 'none'; return; }
+        
+        const filtered = savedNames.filter(name => name.toLowerCase().startsWith(val.toLowerCase()));
+        
+        if (filtered.length > 0) {
+            box.innerHTML = filtered.map(name => `<div class="suggestion-item" onclick="selectSuggestion('${name}')">${name}</div>`).join('');
+            box.style.display = 'block';
+        } else {
+            box.style.display = 'none';
+        }
     }
+
+    function selectSuggestion(name) {
+        document.getElementById('itemName').value = name;
+        document.getElementById('suggestionBox').style.display = 'none';
+    }
+
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (e.target.id !== 'itemName') document.getElementById('suggestionBox').style.display = 'none';
+    });
 
     function addItem() {
         const name = document.getElementById('itemName').value.trim();
@@ -133,11 +140,9 @@
 
         items.push({ name: `${name} (${unit})`, qty, price });
 
-        // Save new item name for future suggestions
         if(!savedNames.includes(name)) {
             savedNames.push(name);
             localStorage.setItem('savedItemNames', JSON.stringify(savedNames));
-            updateSuggestions();
         }
         
         renderTable();
@@ -147,39 +152,26 @@
         document.getElementById('itemName').focus();
     }
 
-    function removeItem(index) {
-        items.splice(index, 1);
-        renderTable();
-    }
+    function removeItem(index) { items.splice(index, 1); renderTable(); }
 
     function renderTable() {
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = '';
-        let total = 0;
+        const tbody = document.getElementById('tableBody'); tbody.innerHTML = ''; let total = 0;
         items.forEach((item, index) => {
-            const subtotal = item.qty * item.price;
-            total += subtotal;
+            const subtotal = item.qty * item.price; total += subtotal;
             tbody.innerHTML += `<tr><td>${item.name}</td><td>${item.qty}</td><td>${item.price.toFixed(0)}</td><td>${subtotal.toFixed(0)}</td><td><button class="btn-remove" onclick="removeItem(${index})">×</button></td></tr>`;
         });
         document.getElementById('grandTotal').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2});
     }
 
-    function resetForm() {
-        if(confirm("Clear list?")) { items = []; document.getElementById('customerName').value = ''; renderTable(); }
-    }
-
     async function generatePDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
         const issuer = document.getElementById('issuerName').value || 'N/A';
         const contact = document.getElementById('issuerContact').value || 'N/A';
         const customer = document.getElementById('customerName').value || 'N/A';
         const date = document.getElementById('displayDate').innerText;
 
-        doc.setFontSize(16);
-        doc.text("MATERIAL ESTIMATE", 14, 20);
-        doc.setFontSize(10);
-        doc.text(`Issued By: ${issuer} | Contact: ${contact}`, 14, 30);
+        doc.setFontSize(16); doc.text("MATERIAL ESTIMATE", 14, 20);
+        doc.setFontSize(10); doc.text(`Issued By: ${issuer} | Contact: ${contact}`, 14, 30);
         doc.text(`Customer: ${customer} | Date: ${date}`, 14, 37);
 
         const tableData = items.map(item => [item.name, item.qty, item.price.toFixed(2), (item.qty * item.price).toFixed(2)]);
