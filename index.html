@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Electrical Estimator Pro</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { 
+            height: 100%; margin: 0; overflow: hidden; 
+            font-family: 'Segoe UI', Arial, sans-serif; background-color: #f0f2f5;
+        }
+        .container { 
+            display: flex; flex-direction: column; height: 100vh; 
+            max-width: 900px; margin: auto; background: white; 
+        }
+        .fixed-top {
+            padding: 15px; border-bottom: 2px solid #34495e; background: #fff; flex-shrink: 0;
+        }
+        header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .title-area h1 { margin: 0; font-size: 1.3em; color: #2c3e50; }
+        .meta-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .meta-box label { display: block; font-weight: bold; font-size: 0.7em; margin-bottom: 2px; }
+        .meta-box input { width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85em; }
+
+        .input-section { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .input-grid { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; align-items: end; }
+        .input-grid input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%; font-size: 0.9em; }
+        .btn-add { padding: 0 15px; background: #3498db; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; height: 40px; }
+
+        .scrollable-list {
+            flex-grow: 1; overflow-y: auto; padding: 0 15px; -webkit-overflow-scrolling: touch;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th { position: sticky; top: 0; background: #34495e; color: white; padding: 10px; text-align: left; z-index: 10; font-size: 0.85em; }
+        td { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 0.9em; }
+        .btn-remove { background: #ff4757; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; }
+
+        .fixed-bottom {
+            padding: 15px; border-top: 2px solid #34495e; background: #fff; flex-shrink: 0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .total-amount { font-size: 1.4em; font-weight: bold; color: #2c3e50; }
+        .actions { display: flex; gap: 8px; }
+        .btn-print { padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        .btn-reset { padding: 10px 15px; background: #95a5a6; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 0.9em; }
+
+        @media print {
+            html, body { overflow: visible; height: auto; }
+            .container { height: auto; display: block; }
+            .fixed-top, .fixed-bottom, .btn-remove, th:last-child, td:last-child, .input-section { display: none !important; }
+            .scrollable-list { overflow: visible; padding: 0; }
+        }
+        @media (max-width: 600px) {
+            .meta-row { grid-template-columns: 1fr; }
+            .input-grid { grid-template-columns: 1fr 1fr 1fr; }
+            .input-grid input:first-child { grid-column: span 3; }
+            .btn-add { grid-column: span 3; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="fixed-top">
+        <header>
+            <div class="title-area"><h1>Material List</h1></div>
+            <div style="font-size: 0.8em;"><span id="displayDate"></span></div>
+        </header>
+
+        <div class="meta-row">
+            <div class="meta-box"><label>Issued By:</label><input type="text" id="issuerName"></div>
+            <div class="meta-box"><label>Contact:</label><input type="text" id="issuerContact"></div>
+            <div class="meta-box"><label>Customer:</label><input type="text" id="customerName"></div>
+        </div>
+
+        <div class="input-section">
+            <div class="input-grid">
+                <input type="text" id="itemName" list="itemSuggestions" placeholder="Item Name">
+                <datalist id="itemSuggestions">
+                    <option value="1/1.13 Wire (Red)">
+                    <option value="1/1.13 Wire (Black)">
+                    <option value="7/0.67 Earth Wire">
+                    <option value="13A Socket Outlet">
+                    <option value="10A One-way Switch">
+                    <option value="20A DP Switch">
+                    <option value="MCB 6A">
+                    <option value="MCB 10A">
+                    <option value="MCB 16A">
+                    <option value="Main Switch 32A">
+                    <option value="Ceiling Fan">
+                    <option value="LED Panel Light 12W">
+                </datalist>
+                
+                <input type="number" id="qty" placeholder="Qty">
+                <input type="number" id="price" placeholder="Price">
+                <button class="btn-add" onclick="addItem()">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="scrollable-list">
+        <table>
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th style="width: 50px;">Qty</th>
+                    <th style="width: 80px;">Price</th>
+                    <th style="width: 80px;">Total</th>
+                    <th style="width: 40px;"></th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="fixed-bottom">
+        <div><span style="font-size: 0.8em; color: #7f8c8d;">Grand Total:</span><br>
+        <span class="total-amount">LKR <span id="grandTotal">0.00</span></span></div>
+        <div class="actions">
+            <button class="btn-reset" onclick="resetForm()">Clear</button>
+            <button class="btn-print" onclick="window.print()">Save PDF</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('displayDate').innerText = new Date().toLocaleDateString('en-GB');
+    
+    let items = [];
+    let savedNames = new Set(); // Stores unique item names
+
+    function addItem() {
+        const name = document.getElementById('itemName').value.trim();
+        const qty = parseFloat(document.getElementById('qty').value);
+        const price = parseFloat(document.getElementById('price').value);
+
+        if(!name || isNaN(qty) || isNaN(price)) return;
+
+        items.push({ id: Date.now(), name, qty, price });
+        
+        // Add name to suggestions if not already there
+        if(!savedNames.has(name)) {
+            savedNames.add(name);
+            const datalist = document.getElementById('itemSuggestions');
+            const option = document.createElement('option');
+            option.value = name;
+            datalist.appendChild(option);
+        }
+
+        renderTable();
+        
+        document.getElementById('itemName').value = '';
+        document.getElementById('qty').value = '';
+        document.getElementById('price').value = '';
+        document.getElementById('itemName').focus();
+    }
+
+    function removeItem(id) {
+        items = items.filter(item => item.id !== id);
+        renderTable();
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '';
+        let total = 0;
+
+        items.forEach(item => {
+            const subtotal = item.qty * item.price;
+            total += subtotal;
+            tbody.innerHTML += `<tr>
+                <td>${item.name}</td>
+                <td>${item.qty}</td>
+                <td>${item.price.toFixed(0)}</td>
+                <td>${subtotal.toFixed(0)}</td>
+                <td><button class="btn-remove" onclick="removeItem(${item.id})">×</button></td>
+            </tr>`;
+        });
+
+        document.getElementById('grandTotal').innerText = total.toLocaleString(undefined, {minimumFractionDigits: 2});
+    }
+
+    function resetForm() {
+        if(confirm("Clear current list?")) {
+            items = [];
+            document.getElementById('customerName').value = '';
+            renderTable();
+        }
+    }
+</script>
+
+</body>
+</html>
