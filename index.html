@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Electrical Estimator Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    
     <style>
         * { box-sizing: border-box; }
         html, body { 
@@ -42,15 +45,9 @@
         }
         .total-amount { font-size: 1.4em; font-weight: bold; color: #2c3e50; }
         .actions { display: flex; gap: 8px; }
-        .btn-print { padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
+        .btn-download { padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
         .btn-reset { padding: 10px 15px; background: #95a5a6; color: white; border: none; border-radius: 20px; cursor: pointer; font-size: 0.9em; }
 
-        @media print {
-            html, body { overflow: visible; height: auto; }
-            .container { height: auto; display: block; }
-            .fixed-top, .fixed-bottom, .btn-remove, th:last-child, td:last-child, .input-section { display: none !important; }
-            .scrollable-list { overflow: visible; padding: 0; }
-        }
         @media (max-width: 600px) {
             .meta-row { grid-template-columns: 1fr; }
             .input-grid { grid-template-columns: 1fr 1fr 1fr; }
@@ -69,9 +66,9 @@
         </header>
 
         <div class="meta-row">
-            <div class="meta-box"><label>Issued By:</label><input type="text" id="issuerName"></div>
-            <div class="meta-box"><label>Contact:</label><input type="text" id="issuerContact"></div>
-            <div class="meta-box"><label>Customer:</label><input type="text" id="customerName"></div>
+            <div class="meta-box"><label>Issued By:</label><input type="text" id="issuerName" placeholder="Your Name"></div>
+            <div class="meta-box"><label>Contact:</label><input type="text" id="issuerContact" placeholder="Phone"></div>
+            <div class="meta-box"><label>Customer:</label><input type="text" id="customerName" placeholder="Client Name"></div>
         </div>
 
         <div class="input-section">
@@ -87,11 +84,7 @@
                     <option value="MCB 6A">
                     <option value="MCB 10A">
                     <option value="MCB 16A">
-                    <option value="Main Switch 32A">
-                    <option value="Ceiling Fan">
-                    <option value="LED Panel Light 12W">
                 </datalist>
-                
                 <input type="number" id="qty" placeholder="Qty">
                 <input type="number" id="price" placeholder="Price">
                 <button class="btn-add" onclick="addItem()">Add</button>
@@ -119,7 +112,7 @@
         <span class="total-amount">LKR <span id="grandTotal">0.00</span></span></div>
         <div class="actions">
             <button class="btn-reset" onclick="resetForm()">Clear</button>
-            <button class="btn-print" onclick="window.print()">Save PDF</button>
+            <button class="btn-download" onclick="generatePDF()">Download PDF</button>
         </div>
     </div>
 </div>
@@ -128,7 +121,7 @@
     document.getElementById('displayDate').innerText = new Date().toLocaleDateString('en-GB');
     
     let items = [];
-    let savedNames = new Set(); // Stores unique item names
+    let savedNames = new Set();
 
     function addItem() {
         const name = document.getElementById('itemName').value.trim();
@@ -137,9 +130,8 @@
 
         if(!name || isNaN(qty) || isNaN(price)) return;
 
-        items.push({ id: Date.now(), name, qty, price });
+        items.push({ name, qty, price });
         
-        // Add name to suggestions if not already there
         if(!savedNames.has(name)) {
             savedNames.add(name);
             const datalist = document.getElementById('itemSuggestions');
@@ -149,15 +141,14 @@
         }
 
         renderTable();
-        
         document.getElementById('itemName').value = '';
         document.getElementById('qty').value = '';
         document.getElementById('price').value = '';
         document.getElementById('itemName').focus();
     }
 
-    function removeItem(id) {
-        items = items.filter(item => item.id !== id);
+    function removeItem(index) {
+        items.splice(index, 1);
         renderTable();
     }
 
@@ -166,7 +157,7 @@
         tbody.innerHTML = '';
         let total = 0;
 
-        items.forEach(item => {
+        items.forEach((item, index) => {
             const subtotal = item.qty * item.price;
             total += subtotal;
             tbody.innerHTML += `<tr>
@@ -174,7 +165,7 @@
                 <td>${item.qty}</td>
                 <td>${item.price.toFixed(0)}</td>
                 <td>${subtotal.toFixed(0)}</td>
-                <td><button class="btn-remove" onclick="removeItem(${item.id})">×</button></td>
+                <td><button class="btn-remove" onclick="removeItem(${index})">×</button></td>
             </tr>`;
         });
 
@@ -187,6 +178,45 @@
             document.getElementById('customerName').value = '';
             renderTable();
         }
+    }
+
+    async function generatePDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        const issuer = document.getElementById('issuerName').value || 'N/A';
+        const contact = document.getElementById('issuerContact').value || 'N/A';
+        const customer = document.getElementById('customerName').value || 'N/A';
+        const date = document.getElementById('displayDate').innerText;
+
+        // PDF Header
+        doc.setFontSize(18);
+        doc.text("MATERIAL ESTIMATE", 14, 20);
+        
+        doc.setFontSize(10);
+        doc.text(`Issued By: ${issuer}`, 14, 30);
+        doc.text(`Contact: ${contact}`, 14, 35);
+        doc.text(`Customer: ${customer}`, 14, 40);
+        doc.text(`Date: ${date}`, 160, 30);
+
+        // Table Data
+        const tableData = items.map(item => [
+            item.name,
+            item.qty,
+            item.price.toFixed(2),
+            (item.qty * item.price).toFixed(2)
+        ]);
+
+        doc.autoTable({
+            startY: 50,
+            head: [['Item Description', 'Qty', 'Unit Price', 'Subtotal']],
+            body: tableData,
+            foot: [['', '', 'Grand Total', `LKR ${document.getElementById('grandTotal').innerText}`]],
+            theme: 'striped',
+            headStyles: { fillColor: [44, 62, 80] }
+        });
+
+        doc.save(`Estimate_${customer}_${date}.pdf`);
     }
 </script>
 
