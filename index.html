@@ -16,11 +16,10 @@
         .meta-box label { display: block; font-weight: bold; font-size: 0.7em; margin-bottom: 2px; }
         .meta-box input { width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85em; }
         .input-section { background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; position: relative; }
-        .input-grid { display: grid; grid-template-columns: 2fr 0.8fr 1fr 1.2fr auto; gap: 5px; align-items: end; }
+        .input-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 5px; align-items: end; }
         .input-grid input, .input-grid select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; width: 100%; font-size: 0.85em; }
         .btn-add { padding: 0 15px; background: #3498db; color: white; border: none; border-radius: 6px; font-weight: bold; height: 40px; cursor: pointer; }
 
-        /* Custom Suggestion List Styles */
         #suggestionBox {
             position: absolute; background: white; border: 1px solid #ddd; border-radius: 4px;
             width: 40%; max-height: 150px; overflow-y: auto; z-index: 100; display: none;
@@ -37,7 +36,14 @@
         .fixed-bottom { padding: 15px; border-top: 2px solid #34495e; background: #fff; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; }
         .total-amount { font-size: 1.4em; font-weight: bold; color: #2c3e50; }
         .btn-download { padding: 10px 20px; background: #27ae60; color: white; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; }
-        @media (max-width: 600px) { .meta-row { grid-template-columns: 1fr; } .input-grid { grid-template-columns: 1fr 1fr; } .input-grid input:first-child { grid-column: span 2; } .btn-add { grid-column: span 2; } #suggestionBox { width: 90%; } }
+        
+        @media (max-width: 600px) { 
+            .meta-row { grid-template-columns: 1fr; } 
+            .input-grid { grid-template-columns: 1fr 1fr; } 
+            .input-grid div:first-child { grid-column: span 2; } 
+            .btn-add { grid-column: span 2; } 
+            #suggestionBox { width: 90%; }
+        }
     </style>
 </head>
 <body>
@@ -45,7 +51,7 @@
 <div class="container">
     <div class="fixed-top">
         <header style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-            <h1 style="margin:0; font-size: 1.2em;">Material List</h1>
+            <h1 style="margin:0; font-size: 1.1em;">Job Estimate & Material List</h1>
             <span id="displayDate" style="font-size: 0.8em; color: #7f8c8d;"></span>
         </header>
 
@@ -58,13 +64,16 @@
         <div class="input-section">
             <div class="input-grid">
                 <div style="position: relative; width: 100%;">
-                    <input type="text" id="itemName" placeholder="Item Name" autocomplete="off" oninput="showSuggestions(this.value)">
+                    <input type="text" id="itemName" placeholder="Item or Labor Name" autocomplete="off" oninput="showSuggestions(this.value)">
                     <div id="suggestionBox"></div>
                 </div>
                 
                 <select id="unit">
-                    <option value="pcs">pcs</option><option value="m">mtr</option>
-                    <option value="ft">ft</option><option value="roll">roll</option><option value="box">box</option>
+                    <option value="pcs">pcs</option>
+                    <option value="m">mtr</option>
+                    <option value="ft">ft</option>
+                    <option value="Labor">Labor</option>
+                    <option value="Other">Other</option>
                 </select>
                 <input type="number" id="qty" placeholder="Qty">
                 <input type="number" id="price" placeholder="Price">
@@ -76,7 +85,7 @@
     <div class="scrollable-list">
         <table>
             <thead>
-                <tr><th>Item</th><th style="width: 70px;">Qty</th><th style="width: 80px;">Unit P.</th><th style="width: 80px;">Total</th><th style="width: 30px;"></th></tr>
+                <tr><th>Description</th><th style="width: 60px;">Qty</th><th style="width: 80px;">Rate</th><th style="width: 80px;">Total</th><th style="width: 30px;"></th></tr>
             </thead>
             <tbody id="tableBody"></tbody>
         </table>
@@ -86,7 +95,7 @@
         <div><span style="font-size: 0.7em; color: #7f8c8d;">Grand Total:</span><br>
         <span class="total-amount">LKR <span id="grandTotal">0.00</span></span></div>
         <div class="actions">
-            <button class="btn-download" onclick="generatePDF()">PDF</button>
+            <button class="btn-download" onclick="generatePDF()">Download PDF</button>
         </div>
     </div>
 </div>
@@ -94,7 +103,7 @@
 <script>
     document.getElementById('displayDate').innerText = new Date().toLocaleDateString('en-GB');
     let items = [];
-    let savedNames = JSON.parse(localStorage.getItem('savedItemNames')) || ["PVC Conduit", "Wire 1/1.13", "MCB 16A", "Switch 10A"];
+    let savedNames = JSON.parse(localStorage.getItem('savedItemNames')) || ["Wiring Work", "Point Installation", "DB Fixing", "PVC Conduit", "Wire 1/1.13"];
 
     window.onload = function() {
         if(localStorage.getItem('issuerName')) document.getElementById('issuerName').value = localStorage.getItem('issuerName');
@@ -109,26 +118,17 @@
     function showSuggestions(val) {
         const box = document.getElementById('suggestionBox');
         if (!val) { box.style.display = 'none'; return; }
-        
-        const filtered = savedNames.filter(name => name.toLowerCase().startsWith(val.toLowerCase()));
-        
+        const filtered = savedNames.filter(name => name.toLowerCase().includes(val.toLowerCase()));
         if (filtered.length > 0) {
             box.innerHTML = filtered.map(name => `<div class="suggestion-item" onclick="selectSuggestion('${name}')">${name}</div>`).join('');
             box.style.display = 'block';
-        } else {
-            box.style.display = 'none';
-        }
+        } else { box.style.display = 'none'; }
     }
 
     function selectSuggestion(name) {
         document.getElementById('itemName').value = name;
         document.getElementById('suggestionBox').style.display = 'none';
     }
-
-    // Hide suggestions when clicking outside
-    document.addEventListener('click', function(e) {
-        if (e.target.id !== 'itemName') document.getElementById('suggestionBox').style.display = 'none';
-    });
 
     function addItem() {
         const name = document.getElementById('itemName').value.trim();
@@ -138,7 +138,9 @@
 
         if(!name || isNaN(qty) || isNaN(price)) return;
 
-        items.push({ name: `${name} (${unit})`, qty, price });
+        // If Labor is selected, we format the name differently in the table
+        const displayName = (unit === "Labor") ? `[LABOR] ${name}` : `${name} (${unit})`;
+        items.push({ name: displayName, qty, price });
 
         if(!savedNames.includes(name)) {
             savedNames.push(name);
@@ -170,12 +172,15 @@
         const customer = document.getElementById('customerName').value || 'N/A';
         const date = document.getElementById('displayDate').innerText;
 
-        doc.setFontSize(16); doc.text("MATERIAL ESTIMATE", 14, 20);
-        doc.setFontSize(10); doc.text(`Issued By: ${issuer} | Contact: ${contact}`, 14, 30);
-        doc.text(`Customer: ${customer} | Date: ${date}`, 14, 37);
+        doc.setFontSize(16); doc.text("JOB ESTIMATE & INVOICE", 14, 20);
+        doc.setFontSize(10); 
+        doc.text(`Issued By: ${issuer}`, 14, 30);
+        doc.text(`Contact: ${contact}`, 14, 35);
+        doc.text(`Customer: ${customer}`, 14, 42);
+        doc.text(`Date: ${date}`, 160, 30);
 
         const tableData = items.map(item => [item.name, item.qty, item.price.toFixed(2), (item.qty * item.price).toFixed(2)]);
-        doc.autoTable({ startY: 45, head: [['Item Description', 'Qty', 'Unit Price', 'Subtotal']], body: tableData, foot: [['', '', 'Grand Total', `LKR ${document.getElementById('grandTotal').innerText}`]], headStyles: { fillColor: [44, 62, 80] } });
+        doc.autoTable({ startY: 50, head: [['Description', 'Qty', 'Rate', 'Subtotal']], body: tableData, foot: [['', '', 'Grand Total', `LKR ${document.getElementById('grandTotal').innerText}`]], headStyles: { fillColor: [44, 62, 80] } });
         doc.save(`Estimate_${customer}.pdf`);
     }
 </script>
